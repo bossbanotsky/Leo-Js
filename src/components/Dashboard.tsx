@@ -16,15 +16,26 @@ export default function Dashboard() {
   const totalOpEx = todaysExpenses.reduce((sum, e) => sum + e.amount, 0);
   const totalCrm = todaysCrm.reduce((sum, t) => sum + t.amount, 0);
   
+  // Gross Profit = Revenue from sales - estimated cost of goods sold
+  // Since we don't have historical price tracking for exact batches, 
+  // we'll estimate using current buy prices or transaction costs
+  const grossProfit = todaysTransactions
+    .filter(t => t.type === 'sell')
+    .reduce((sum, t) => {
+      const material = materials.find(m => m.id === t.materialId);
+      const estCost = (material?.buyPrice || 0) * t.quantity;
+      return sum + (t.totalAmount - estCost);
+    }, 0);
+
   const netProfit = totalSold - totalBought - totalOpEx - totalCrm;
 
   // Quick stats summary
   const stats = [
     { label: "Today's Gross Sales", value: `₱${totalSold.toFixed(2)}`, icon: <ArrowUpRight size={24} className="text-emerald-500" /> },
     { label: "Today's Mat. Purchases", value: `₱${totalBought.toFixed(2)}`, icon: <ArrowDownLeft size={24} className="text-rose-500" /> },
+    { label: "Est. Margin on Sales", value: `₱${grossProfit.toFixed(2)}`, icon: <Banknote size={24} className="text-amber-500" /> },
     { label: "Today's Op Expenses", value: `₱${totalOpEx.toFixed(2)}`, icon: <ReceiptText size={24} className="text-orange-500" /> },
-    { label: "Today's CRM Transactions", value: `₱${totalCrm.toFixed(2)}`, icon: <Banknote size={24} className="text-purple-500" /> },
-    { label: "Today's Net Profit", value: `₱${netProfit.toFixed(2)}`, icon: <Banknote size={24} className="text-blue-500" /> },
+    { label: "Today's Net Cashflow", value: `₱${netProfit.toFixed(2)}`, icon: <Banknote size={24} className="text-blue-500" /> },
   ];
 
   // Process data for charts

@@ -252,6 +252,13 @@ export default function Inventory() {
                     <div>Buy: <span className="font-semibold text-gray-700">₱{m.buyPrice.toFixed(2)}</span></div>
                     <div>Sell: <span className="font-semibold text-blue-700">₱{m.sellPrice.toFixed(2)}</span></div>
                     <div className="flex gap-2 justify-end mt-2 pt-2 border-t border-gray-100">
+                      <div className="flex-1 text-left">
+                        {m.sellPrice > 0 && (
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${((m.sellPrice - m.buyPrice) / m.sellPrice) > 0.3 ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400'}`}>
+                            {Math.round(((m.sellPrice - m.buyPrice) / m.sellPrice) * 100)}% MARGIN
+                          </span>
+                        )}
+                      </div>
                       <button onClick={() => setSelectedMaterial(m)} className="text-slate-300 hover:text-purple-500" title="View transactions"><FileText size={14}/></button>
                       <button onClick={() => openModal(m)} className="text-slate-300 hover:text-blue-500" title="Edit material"><Edit size={14}/></button>
                       {m.conversionRate && (

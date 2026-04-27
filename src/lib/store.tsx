@@ -12,6 +12,7 @@ interface AppState {
   clientTransactions: ClientTransaction[];
   recurringTransactions: RecurringTransactionSchedule[];
   addTransaction: (transaction: Omit<Transaction, 'id' | 'date' | 'totalAmount' | 'createdAt' | 'userId'>) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
   addClientTransaction: (transaction: Omit<ClientTransaction, 'id' | 'createdAt' | 'userId'>) => Promise<void>;
   addRecurringTransaction: (recurring: Omit<RecurringTransactionSchedule, 'id' | 'createdAt' | 'userId'>) => Promise<void>;
   syncCrmTransactionsToExpenses: () => Promise<void>;
@@ -159,6 +160,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
     } catch (error) {
       console.error("Transaction failed: ", error);
+    }
+  };
+
+  const deleteTransaction = async (id: string) => {
+    if (!user) return;
+    
+    const txToDelete = transactions.find(t => t.id === id);
+    if (!txToDelete) return;
+
+    const materialRef = doc(db, `users/${user.uid}/materials`, txToDelete.materialId);
+    const txRef = doc(db, `users/${user.uid}/transactions`, id);
+    const now = Date.now();
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const matDoc = await transaction.get(materialRef);
+        
+        let newStock = 0;
+        if (matDoc.exists()) {
+          const currentStock = matDoc.data().currentStock || 0;
+          // Reverse the stock change: if we bought, we subtract; if we sold, we add
+          const stockChange = txToDelete.type === 'buy' ? -txToDelete.quantity : txToDelete.quantity;
+          newStock = Math.max(0, currentStock + stockChange);
+          transaction.update(materialRef, { currentStock: newStock, updatedAt: now });
+        }
+
+        transaction.delete(txRef);
+        
+        // Update local state
+        setTransactions(prev => {
+          const newList = prev.filter(t => t.id !== id);
+          localStorage.setItem('transactions_cache', JSON.stringify(newList));
+          localStorage.setItem('transactions_timestamp', String(Date.now()));
+          return newList;
+        });
+        
+        if (matDoc.exists()) {
+          setMaterials(prev => {
+            const newList = prev.map(m => m.id === txToDelete.materialId ? { ...m, currentStock: newStock, updatedAt: now } : m);
+            localStorage.setItem('materials_cache', JSON.stringify(newList));
+            localStorage.setItem('materials_timestamp', String(Date.now()));
+            return newList;
+          });
+        }
+      });
+    } catch (error) {
+      console.error("Failed to delete transaction: ", error);
+      throw error;
     }
   };
 
@@ -432,7 +481,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ materials, transactions, expenses, clients, clientTransactions, recurringTransactions, addTransaction, addClientTransaction, addRecurringTransaction, syncCrmTransactionsToExpenses, updateMaterialPrice, addMaterial, updateMaterial, deleteMaterial, addExpense, updateExpense, deleteExpense, addClient, updateClient, deleteClient, loading }}>
+    <AppContext.Provider value={{ materials, transactions, expenses, clients, clientTransactions, recurringTransactions, addTransaction, deleteTransaction, addClientTransaction, addRecurringTransaction, syncCrmTransactionsToExpenses, updateMaterialPrice, addMaterial, updateMaterial, deleteMaterial, addExpense, updateExpense, deleteExpense, addClient, updateClient, deleteClient, loading }}>
         {children}
     </AppContext.Provider>
   );

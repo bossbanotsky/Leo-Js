@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../lib/store';
 import { useAuth } from '../lib/AuthContext';
-import { Plus, ArrowDownLeft, ArrowUpRight, Search, Printer, Calendar, X, FileText } from 'lucide-react';
+import { Plus, ArrowDownLeft, ArrowUpRight, Search, Printer, Calendar, X, FileText, Trash2 } from 'lucide-react';
 import { PaymentMethod, Transaction } from '../types';
 
 export default function Transactions() {
-  const { transactions, materials, addTransaction, clients } = useAppStore();
+  const { transactions, materials, addTransaction, deleteTransaction, clients } = useAppStore();
   const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -119,6 +119,16 @@ export default function Transactions() {
       .filter(t => t.type === 'buy')
       .reduce((sum, t) => sum + t.totalAmount, 0);
   }, [filteredTransactions]);
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this transaction? This will also revert the inventory stock change.')) {
+      try {
+        await deleteTransaction(id);
+      } catch (error) {
+        alert('Failed to delete transaction.');
+      }
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -248,13 +258,20 @@ export default function Transactions() {
                     <td className="px-6 py-4 text-right text-gray-600">{t.quantity} <span className="text-gray-400 text-xs">{material?.unit}</span></td>
                     <td className="px-6 py-4 text-right text-gray-600">₱{t.pricePerUnit.toFixed(2)}</td>
                     <td className="px-6 py-4 text-right font-bold font-mono text-blue-700">₱{t.totalAmount.toFixed(2)}</td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right space-x-3">
                       <button 
                         onClick={() => setReceiptTx(t)}
                         className="text-gray-400 hover:text-blue-600 transition-colors"
                         title="View Receipt"
                       >
                         <FileText size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(t.id)}
+                        className="text-gray-400 hover:text-red-600 transition-colors"
+                        title="Delete Transaction"
+                      >
+                        <Trash2 size={18} />
                       </button>
                     </td>
                   </tr>
@@ -321,7 +338,13 @@ export default function Transactions() {
                   </div>
                 </div>
 
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-4 items-center">
+                  <button 
+                    onClick={() => handleDelete(t.id)}
+                    className="flex items-center gap-2 text-xs font-bold text-red-600 hover:text-red-800 transition-colors py-1 cursor-pointer"
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
                   <button 
                     onClick={() => setReceiptTx(t)}
                     className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors py-1 cursor-pointer"
