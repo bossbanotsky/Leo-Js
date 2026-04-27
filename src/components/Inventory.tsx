@@ -54,12 +54,26 @@ export default function Inventory() {
     return matchType && matchSearch;
   });
 
+  const [unitChangeConfirm, setUnitChangeConfirm] = useState<{ id: string, oldUnit: string, newUnit: string, currentStock: number } | null>(null);
+  const [unitConversionFactor, setUnitConversionFactor] = useState<number>(1);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || buyPrice === '' || sellPrice === '') return;
 
     try {
       if (editingId) {
+        const material = materials.find(m => m.id === editingId);
+        if (material && material.unit !== unit && material.currentStock > 0) {
+          setUnitChangeConfirm({
+            id: editingId,
+            oldUnit: material.unit,
+            newUnit: unit,
+            currentStock: material.currentStock
+          });
+          return;
+        }
+
         await updateMaterial(editingId, {
           name,
           type,
@@ -85,6 +99,32 @@ export default function Inventory() {
       setSellPrice('');
     } catch (err: any) {
       setAlertModal({ title: "Error saving material", message: err.message });
+    }
+  };
+
+  const executeUnitChangeWithConversion = async (applyConversion: boolean) => {
+    if (!unitChangeConfirm) return;
+
+    try {
+      const newStock = applyConversion 
+        ? unitChangeConfirm.currentStock * unitConversionFactor 
+        : unitChangeConfirm.currentStock;
+
+      await updateMaterial(unitChangeConfirm.id, {
+        name,
+        type,
+        buyPrice: Number(buyPrice),
+        sellPrice: Number(sellPrice),
+        unit: unitChangeConfirm.newUnit,
+        currentStock: newStock,
+        conversionRate: conversionRate !== '' ? Number(conversionRate) : undefined
+      });
+
+      setIsModalOpen(false);
+      setUnitChangeConfirm(null);
+      setUnitConversionFactor(1);
+    } catch (err: any) {
+      setAlertModal({ title: "Error", message: "Failed to update material: " + err.message });
     }
   };
 
@@ -389,6 +429,53 @@ export default function Inventory() {
         onCancel={() => setConvertConfirm(null)}
         confirmText="Convert"
       />
+
+      <ConfirmModal
+        isOpen={unitChangeConfirm !== null}
+        title="Unit Changed"
+        message=""
+        onConfirm={() => executeUnitChangeWithConversion(true)}
+        onCancel={() => setUnitChangeConfirm(null)}
+        confirmText="Convert & Save"
+        cancelText="Cancel"
+        confirmVariant="primary"
+      >
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-gray-600">
+            You changed the unit from <span className="font-bold">{unitChangeConfirm?.oldUnit}</span> to <span className="font-bold">{unitChangeConfirm?.newUnit}</span>.
+            Existing stock is <span className="font-bold">{unitChangeConfirm?.currentStock} {unitChangeConfirm?.oldUnit}</span>.
+          </p>
+          <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg text-sm text-amber-800">
+            Would you like to convert the existing stock?
+          </div>
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Conversion Factor</label>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-400">1 {unitChangeConfirm?.oldUnit} = </span>
+              <input 
+                type="number"
+                step="0.0001"
+                value={unitConversionFactor}
+                onChange={(e) => setUnitConversionFactor(Number(e.target.value))}
+                className="w-24 px-2 py-1 border border-gray-200 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+              <span className="text-sm text-gray-400">{unitChangeConfirm?.newUnit}</span>
+            </div>
+            <p className="text-[10px] text-gray-400 italic mt-1">
+              New Stock will be: {(unitChangeConfirm?.currentStock || 0) * unitConversionFactor} {unitChangeConfirm?.newUnit}
+            </p>
+          </div>
+          <div className="pt-2">
+            <button 
+              type="button"
+              onClick={() => executeUnitChangeWithConversion(false)}
+              className="text-blue-600 text-sm font-semibold hover:underline"
+            >
+              Don't convert, just change unit name
+            </button>
+          </div>
+        </div>
+      </ConfirmModal>
 
       {selectedMaterial && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">

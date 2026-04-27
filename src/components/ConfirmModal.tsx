@@ -8,6 +8,8 @@ interface ConfirmModalProps {
   onCancel: () => void;
   confirmText?: string;
   cancelText?: string;
+  confirmVariant?: 'danger' | 'primary';
+  children?: React.ReactNode;
 }
 
 export default function ConfirmModal({
@@ -17,7 +19,9 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
   confirmText = "Confirm",
-  cancelText = "Cancel"
+  cancelText = "Cancel",
+  confirmVariant = 'danger',
+  children
 }: ConfirmModalProps) {
   if (!isOpen) return null;
 
@@ -27,8 +31,9 @@ export default function ConfirmModal({
         <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 text-gray-900">
           <h3 className="font-bold text-lg">{title}</h3>
         </div>
-        <div className="p-6 text-slate-700 text-sm">
-          {message}
+        <div className="p-6 text-slate-700 text-sm space-y-3">
+          {message && <p>{message}</p>}
+          {children}
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
           <button 
@@ -41,7 +46,9 @@ export default function ConfirmModal({
             onClick={() => {
               onConfirm();
             }}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            className={`px-4 py-2 text-white rounded-lg transition-colors ${
+              confirmVariant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-900 hover:bg-slate-800'
+            }`}
           >
             {confirmText}
           </button>
