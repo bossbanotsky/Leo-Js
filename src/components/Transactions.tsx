@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../lib/store';
 import { useAuth } from '../lib/AuthContext';
-import { Plus, ArrowDownLeft, ArrowUpRight, Search, Printer, Calendar, X, FileText, Trash2 } from 'lucide-react';
+import { Plus, ArrowDownLeft, ArrowUpRight, Search, Printer, Calendar, X, FileText, Trash2, Scale } from 'lucide-react';
 import { PaymentMethod, Transaction } from '../types';
+import { UNITS } from '../constants';
 
 export default function Transactions() {
   const { transactions, materials, addTransaction, deleteTransaction, clients } = useAppStore();
@@ -20,6 +21,9 @@ export default function Transactions() {
   const [clientId, setClientId] = useState('');
   const [clientName, setClientName] = useState('');
   const [notes, setNotes] = useState('');
+  const [selectedUnit, setSelectedUnit] = useState<string>('kg');
+  const [useConversion, setUseConversion] = useState(false);
+  const [conversionFactor, setConversionFactor] = useState<number>(1);
 
   // Filtering state
   const [dateStart, setDateStart] = useState<string>('');
@@ -31,9 +35,10 @@ export default function Transactions() {
   // Auto-fill price when material changes
   const handleMaterialChange = (id: string, currentType: 'buy' | 'sell') => {
     setMaterialId(id);
-    const m = materials.find(x => x.id === id);
-    if (m) {
-      setPricePerUnit(currentType === 'buy' ? m.buyPrice : m.sellPrice);
+    const currentMaterial = materials.find(x => x.id === id);
+    if (currentMaterial) {
+      setPricePerUnit(currentType === 'buy' ? currentMaterial.buyPrice : currentMaterial.sellPrice);
+      setSelectedUnit(currentMaterial.unit || 'kg');
     }
   };
 
@@ -53,11 +58,31 @@ export default function Transactions() {
     e.preventDefault();
     if (!materialId || quantity === '' || pricePerUnit === '') return;
 
+    const material = materials.find(m => m.id === materialId);
+    if (!material) return;
+
+    // Calculate normalized quantity in material's base unit
+    // If user is using a different unit for transaction, we convert it back to material's stock unit
+    let normalizedQuantity = Number(quantity);
+    let normalizedPrice = Number(pricePerUnit);
+
+    if (useConversion && selectedUnit !== material.unit) {
+      // If user says "I am buying 1 Sack (50kg) at 500 pesos per sack"
+      // Material base unit is 'kg'
+      // quantity = 1 (sack)
+      // pricePerUnit = 500 (per sack)
+      // conversionFactor = 50
+      // normalizedQuantity = 1 * 50 = 50 kg
+      // normalizedPrice = 500 / 50 = 10 per kg
+      normalizedQuantity = Number(quantity) * conversionFactor;
+      normalizedPrice = Number(pricePerUnit) / (conversionFactor || 1);
+    }
+
     const newTxDetails = {
       type,
       materialId,
-      quantity: Number(quantity),
-      pricePerUnit: Number(pricePerUnit),
+      quantity: normalizedQuantity,
+      pricePerUnit: normalizedPrice,
       discount: Number(discount) || 0,
       paymentMethod,
       clientName: clientName || 'Walk-in',
@@ -447,26 +472,91 @@ export default function Transactions() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Quantity</label>
-                  <div className="relative">
-                    <input 
-                      type="number" 
-                      min="0"
-                      step="0.01"
-                      required
-                      placeholder="0.00"
-                      value={quantity}
-                      onChange={(e) => setQuantity(Number(e.target.value))}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all pr-12 font-mono"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold bg-white px-1.5 py-0.5 rounded border border-slate-100 uppercase">
-                      {materials.find(m => m.id === materialId)?.unit || 'u'}
-                    </span>
-                  </div>
-                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-1">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Quantity</label>
+                      <div className="relative">
+                        <input 
+                          type="number" 
+                          min="0"
+                          step="0.01"
+                          required
+                          placeholder="0.00"
+                          value={quantity}
+                          onChange={(e) => setQuantity(Number(e.target.value))}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all pr-12 font-mono"
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => setUseConversion(!useConversion)}
+                          className={`absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold px-1.5 py-0.5 rounded border transition-colors ${useConversion ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-100 text-slate-400'}`}
+                        >
+                          {selectedUnit}
+                        </button>
+                      </div>
+                    </div>
 
-                <div>
+                    <div className="sm:col-span-1">
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Unit for this Tx</label>
+                      <select 
+                        value={selectedUnit}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSelectedUnit(val);
+                          const unitDef = UNITS.find(u => u.value === val);
+                          const mat = materials.find(m => m.id === materialId);
+                          if (unitDef && mat) {
+                            // If base units match, auto-fill conversion factor
+                            const baseUnitDef = UNITS.find(u => u.value === mat.unit);
+                            if (baseUnitDef && baseUnitDef.base === unitDef.base) {
+                              setConversionFactor(unitDef.factor / baseUnitDef.factor);
+                              setUseConversion(true);
+                            }
+                          }
+                        }}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium text-slate-700 text-sm"
+                      >
+                        {UNITS.map(u => (
+                          <option key={u.value} value={u.value}>{u.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {useConversion && (
+                      <div className="sm:col-span-2 bg-blue-50 p-3 rounded-xl border border-blue-100 animate-in fade-in slide-in-from-top-2">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-black text-blue-700 uppercase tracking-tighter flex items-center gap-1">
+                            <Scale size={10} /> Conversion Setup
+                          </span>
+                          <button 
+                            type="button" 
+                            onClick={() => setUseConversion(false)}
+                            className="text-[10px] text-blue-400 hover:text-blue-600"
+                          >
+                            Disable
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 flex items-center bg-white rounded-lg border border-blue-100 px-3 py-2">
+                            <span className="text-xs text-gray-500 mr-2">1 {selectedUnit} = </span>
+                            <input 
+                              type="number"
+                              step="0.0001"
+                              value={conversionFactor}
+                              onChange={(e) => setConversionFactor(Number(e.target.value))}
+                              className="w-full bg-transparent outline-none font-mono text-sm text-blue-700"
+                            />
+                            <span className="text-xs text-gray-500 ml-2">{materials.find(m => m.id === materialId)?.unit || 'base unit'}</span>
+                          </div>
+                          <div className="text-[10px] text-blue-500 font-medium max-w-[120px] leading-tight">
+                            Total will be handled as <b>{(Number(quantity) || 0) * conversionFactor}</b> {materials.find(m => m.id === materialId)?.unit || 'unt'} in inventory.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
                   <div className="flex justify-between items-center mb-1.5 ml-1">
                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">Price / Unit</label>
                     {type === 'buy' && (
@@ -611,7 +701,7 @@ export default function Transactions() {
                 {materials.find(m => m.id === receiptTx.materialId)?.name || 'Unknown'}
               </div>
               <div className="flex justify-between items-center">
-                <span>{receiptTx.quantity} x ₱{receiptTx.pricePerUnit.toFixed(2)}</span>
+                <span>{receiptTx.quantity} {materials.find(m => m.id === receiptTx.materialId)?.unit} x ₱{receiptTx.pricePerUnit.toFixed(2)}</span>
                 <span>₱{(receiptTx.quantity * receiptTx.pricePerUnit).toFixed(2)}</span>
               </div>
               {(receiptTx.discount || 0) > 0 && (

@@ -3,6 +3,7 @@ import { useAppStore } from '../lib/store';
 import { PackageSearch, Plus, PackageX, DatabaseZap, Edit, Trash2, FileText } from 'lucide-react';
 import { MaterialType, Material } from '../types';
 import { defaultMaterials } from '../lib/defaultMaterials';
+import { UNITS } from '../constants';
 import ConfirmModal from './ConfirmModal';
 
 export default function Inventory() {
@@ -351,14 +352,16 @@ export default function Inventory() {
                   </select>
                 </div>
                 <div className="w-full sm:w-1/3">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Unit</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. kg, pcs, meters"
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Base Unit</label>
+                  <select 
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
-                  />
+                  >
+                    {UNITS.map(u => (
+                      <option key={u.value} value={u.value}>{u.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="w-full sm:w-1/3">
                   <label className="block text-sm font-medium text-slate-700 mb-1">Conv. Rate</label>
