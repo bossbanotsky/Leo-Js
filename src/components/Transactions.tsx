@@ -210,7 +210,7 @@ export default function Transactions() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto hidden md:block">
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-50 text-gray-400 uppercase text-[10px] font-bold">
               <tr>
@@ -270,105 +270,166 @@ export default function Transactions() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile List View */}
+        <div className="md:hidden divide-y divide-gray-100">
+          {filteredTransactions.map(t => {
+            const material = materials.find(m => m.id === t.materialId);
+            const date = new Date(t.date);
+            return (
+              <div key={t.id} className="p-4 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {t.type === 'buy' 
+                      ? <div className="p-1.5 rounded bg-green-100 text-green-700"><ArrowDownLeft size={16} /></div>
+                      : <div className="p-1.5 rounded bg-blue-100 text-blue-700"><ArrowUpRight size={16} /></div>
+                    }
+                    <div>
+                      <h4 className="font-bold text-gray-900">{material?.name || 'Unknown'}</h4>
+                      <p className="text-[10px] text-gray-400 uppercase font-bold tracking-tighter">
+                        {date.toLocaleDateString()} at {date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold font-mono text-blue-700">₱{t.totalAmount.toFixed(2)}</div>
+                    <div className="text-[10px] text-gray-400 uppercase font-black uppercase">TOTAL</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between text-xs py-2 px-3 bg-gray-50 rounded-lg">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-gray-400 uppercase font-bold text-[9px]">Client</span>
+                    <span className="text-gray-700 font-medium">{t.clientName}</span>
+                  </div>
+                  <div className="flex flex-col gap-1 text-right">
+                    <span className="text-gray-400 uppercase font-bold text-[9px]">Quantity</span>
+                    <span className="text-gray-700 font-medium">{t.quantity} {material?.unit}</span>
+                  </div>
+                  <div className="flex flex-col gap-1 text-right">
+                    <span className="text-gray-400 uppercase font-bold text-[9px]">Price/Unit</span>
+                    <span className="text-gray-700 font-medium">₱{t.pricePerUnit.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button 
+                    onClick={() => setReceiptTx(t)}
+                    className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors py-1 cursor-pointer"
+                  >
+                    <FileText size={14} /> View Receipt
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {filteredTransactions.length === 0 && (
+            <div className="p-10 text-center text-gray-500 text-sm">
+              No transactions found.
+            </div>
+          )}
+        </div>
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 text-gray-900">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-gray-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 flex flex-col max-h-[95vh]">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 text-gray-900 sticky top-0 z-10">
               <h3 className="font-bold text-lg">Record Transaction</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                ✕
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2">
+                <X size={20} />
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
-              <div className="flex gap-4 p-1 bg-slate-100 rounded-lg">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+              <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
                 <button
                   type="button"
                   onClick={() => { setType('buy'); handleMaterialChange(materialId, 'buy'); }}
-                  className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${type === 'buy' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500'}`}
+                  className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${type === 'buy' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
-                  Buy (Inbound)
+                  Buy (Pay Out)
                 </button>
                 <button
                   type="button"
                   onClick={() => { setType('sell'); handleMaterialChange(materialId, 'sell'); }}
-                  className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${type === 'sell' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}
+                  className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${type === 'sell' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
-                  Sell (Outbound)
+                  Sell (Receive)
                 </button>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Material</label>
-                <select 
-                  value={materialId}
-                  onChange={(e) => handleMaterialChange(e.target.value, type)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
-                >
-                  {materials.map(m => (
-                    <option key={m.id} value={m.id}>{m.name} ({m.type})</option>
-                  ))}
-                </select>
-              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Material</label>
+                  <select 
+                    value={materialId}
+                    onChange={(e) => handleMaterialChange(e.target.value, type)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium text-slate-700"
+                  >
+                    {materials.map(m => (
+                      <option key={m.id} value={m.id}>{m.name} ({m.type})</option>
+                    ))}
+                  </select>
+                </div>
 
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Quantity</label>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Quantity</label>
                   <div className="relative">
                     <input 
                       type="number" 
                       min="0"
                       step="0.01"
                       required
+                      placeholder="0.00"
                       value={quantity}
                       onChange={(e) => setQuantity(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 pr-12"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all pr-12 font-mono"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold bg-white px-1.5 py-0.5 rounded border border-slate-100 uppercase">
                       {materials.find(m => m.id === materialId)?.unit || 'u'}
                     </span>
                   </div>
                 </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Price / Unit</label>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Price / Unit</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₱</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₱</span>
                     <input 
                       type="number" 
                       min="0"
                       step="0.01"
                       required
+                      placeholder="0.00"
                       value={pricePerUnit}
                       onChange={(e) => setPricePerUnit(Number(e.target.value))}
-                      className="w-full pl-7 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono"
                     />
                   </div>
                 </div>
-              </div>
 
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Discount (₱)</label>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Discount</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₱</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₱</span>
                     <input 
                       type="number" 
                       min="0"
                       step="0.01"
                       value={discount}
                       onChange={(e) => setDiscount(Number(e.target.value))}
-                      className="w-full pl-7 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono"
                     />
                   </div>
                 </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Payment Method</label>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Payment</label>
                   <select 
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium text-slate-700"
                   >
                     <option value="Cash">Cash</option>
                     <option value="Card">Card</option>
@@ -379,11 +440,11 @@ export default function Transactions() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">CRM Client (Optional)</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">CRM Client (Optional)</label>
                 <select 
                   value={clientId}
                   onChange={(e) => handleClientChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium text-slate-700"
                 >
                   <option value="">-- No CRM Client --</option>
                   {clients.map(c => (
@@ -391,43 +452,45 @@ export default function Transactions() {
                   ))}
                 </select>
                 {clientId && clients.find(c => c.id === clientId)?.paymentTerms && (
-                  <div className="mt-2 p-2 bg-purple-50 rounded-lg border border-purple-100 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-purple-700">Client Payment Terms:</span>
-                    <span className="text-sm font-bold text-purple-800">{clients.find(c => c.id === clientId)?.paymentTerms}</span>
+                  <div className="mt-2 p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-center justify-between">
+                    <span className="text-[10px] font-black text-blue-700 uppercase tracking-tighter">Client Terms</span>
+                    <span className="text-xs font-bold text-blue-900">{clients.find(c => c.id === clientId)?.paymentTerms}</span>
                   </div>
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Client Name / Walk-in</label>
-                <input 
-                  type="text" 
-                  placeholder={type === 'buy' ? 'Seller or Scavenger Name' : 'Buyer or Recycler Name'}
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900"
-                />
-              </div>
+              {!clientId && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Client Name / Walk-in</label>
+                  <input 
+                    type="text" 
+                    placeholder={type === 'buy' ? 'Seller or Scavenger Name' : 'Buyer or Recycler Name'}
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+              )}
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Notes (Optional)</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Notes (Optional)</label>
                 <textarea 
-                  placeholder="Additional details about this transaction..."
+                  placeholder="Additional details..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 min-h-[80px] resize-y"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all min-h-[80px] resize-none"
                 />
               </div>
 
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                <div className="text-slate-500 text-sm">Total Value:</div>
-                <div className="text-2xl font-bold text-slate-900">
+              <div className="pt-4 mt-2 border-t border-slate-100 flex items-center justify-between">
+                <div className="text-slate-400 text-xs font-bold uppercase tracking-widest">Total Amount</div>
+                <div className="text-2xl font-black text-blue-600 font-mono">
                   ₱{(((Number(quantity) || 0) * (Number(pricePerUnit) || 0)) - (Number(discount) || 0)).toFixed(2)}
                 </div>
               </div>
 
-              <div className="pt-2">
-                <button type="submit" className="w-full py-2.5 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors inline-flex items-center justify-center gap-2">
+              <div className="pt-2 sticky bottom-0 bg-white pb-2">
+                <button type="submit" className="w-full py-4 bg-blue-600 shadow-lg shadow-blue-600/20 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 active:scale-95">
                   <Plus size={20} /> Record Transaction
                 </button>
               </div>
