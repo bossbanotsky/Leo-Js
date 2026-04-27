@@ -390,6 +390,12 @@ export default function Transactions() {
                     <option key={c.id} value={c.id}>{c.name} ({c.type})</option>
                   ))}
                 </select>
+                {clientId && clients.find(c => c.id === clientId)?.paymentTerms && (
+                  <div className="mt-2 p-2 bg-purple-50 rounded-lg border border-purple-100 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-purple-700">Client Payment Terms:</span>
+                    <span className="text-sm font-bold text-purple-800">{clients.find(c => c.id === clientId)?.paymentTerms}</span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -445,6 +451,9 @@ export default function Transactions() {
               <div className="flex justify-between"><span className="text-gray-500">Tx ID:</span> <span className="font-bold">#{(receiptTx.id).toUpperCase()}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Type:</span> <span className="font-bold uppercase text-blue-600">{receiptTx.type}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Client:</span> <span className="font-bold">{receiptTx.clientName}</span></div>
+              {receiptTx.clientId && clients.find(c => c.id === receiptTx.clientId)?.paymentTerms && (
+                <div className="flex justify-between"><span className="text-gray-500">Terms:</span> <span className="font-bold text-purple-700">{clients.find(c => c.id === receiptTx.clientId)?.paymentTerms}</span></div>
+              )}
               {receiptTx.notes && (
                 <div className="mt-2"><span className="text-gray-500 block mb-1">Notes:</span> <span className="text-xs text-gray-700 italic">{receiptTx.notes}</span></div>
               )}

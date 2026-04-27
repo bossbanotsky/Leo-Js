@@ -19,7 +19,11 @@ export default function CRM() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [paymentTerms, setPaymentTerms] = useState('');
+  const [customTerms, setCustomTerms] = useState('');
+  const [useCustomTerms, setUseCustomTerms] = useState(false);
   const [notes, setNotes] = useState('');
+
+  const commonTerms = ['Net 15', 'Net 30', 'Net 60', 'Due on Receipt', 'COD'];
 
   const [filterType, setFilterType] = useState<'All' | 'Supplier' | 'Buyer' | 'Both'>('All');
   const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Inactive' | 'Lead'>('All');
@@ -47,7 +51,18 @@ export default function CRM() {
       setBankAccountNumber(client.bankAccountNumber || '');
       setPhone(client.phone || '');
       setAddress(client.address || '');
-      setPaymentTerms(client.paymentTerms || '');
+      
+      const isCommon = commonTerms.includes(client.paymentTerms || '');
+      if (client.paymentTerms && !isCommon) {
+        setUseCustomTerms(true);
+        setCustomTerms(client.paymentTerms);
+        setPaymentTerms('Custom');
+      } else {
+        setUseCustomTerms(false);
+        setPaymentTerms(client.paymentTerms || '');
+        setCustomTerms('');
+      }
+      
       setNotes(client.notes || '');
     } else {
       setEditingId(null);
@@ -60,6 +75,8 @@ export default function CRM() {
       setPhone('');
       setAddress('');
       setPaymentTerms('');
+      setCustomTerms('');
+      setUseCustomTerms(false);
       setNotes('');
     }
     setIsModalOpen(true);
@@ -70,6 +87,8 @@ export default function CRM() {
     if (!name) return;
 
     try {
+      const finalTerms = paymentTerms === 'Custom' ? customTerms : paymentTerms;
+      
       const clientData = {
         name,
         type,
@@ -79,7 +98,7 @@ export default function CRM() {
         ...(bankAccountNumber.trim() ? { bankAccountNumber: bankAccountNumber.trim() } : {}),
         ...(phone.trim() ? { phone: phone.trim() } : {}),
         ...(address.trim() ? { address: address.trim() } : {}),
-        ...(paymentTerms.trim() ? { paymentTerms: paymentTerms.trim() } : {}),
+        ...(finalTerms.trim() ? { paymentTerms: finalTerms.trim() } : {}),
         ...(notes.trim() ? { notes: notes.trim() } : {})
       };
 
@@ -384,12 +403,36 @@ export default function CRM() {
               
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Payment Terms (Optional)</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Net 30, Due on Receipt"
-                  value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <div className="space-y-2">
+                  <select 
+                    value={paymentTerms} 
+                    onChange={(e) => {
+                      setPaymentTerms(e.target.value);
+                      setUseCustomTerms(e.target.value === 'Custom');
+                      if (e.target.value !== 'Custom') {
+                        setCustomTerms('');
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    <option value="">No Terms</option>
+                    {commonTerms.map(term => (
+                      <option key={term} value={term}>{term}</option>
+                    ))}
+                    <option value="Custom">Custom Terms...</option>
+                  </select>
+                  
+                  {useCustomTerms && (
+                    <input 
+                      type="text" 
+                      placeholder="Enter custom terms"
+                      value={customTerms} 
+                      onChange={(e) => setCustomTerms(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 animate-in fade-in slide-in-from-top-2 duration-200"
+                      autoFocus
+                    />
+                  )}
+                </div>
               </div>
               
               <div>

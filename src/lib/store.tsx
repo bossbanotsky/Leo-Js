@@ -46,98 +46,67 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setTransactions([]);
       setExpenses([]);
       setClients([]);
+      setClientTransactions([]);
+      setRecurringTransactions([]);
       setLoading(false);
       return;
     }
 
-    setLoading(true);
-
-    const materialsRef = collection(db, `users/${user.uid}/materials`);
-    const transactionsRef = collection(db, `users/${user.uid}/transactions`);
-    const expensesRef = collection(db, `users/${user.uid}/expenses`);
-    const clientsRef = collection(db, `users/${user.uid}/clients`);
-    const clientTransactionsRef = collection(db, `users/${user.uid}/clientTransactions`);
-    const recurringTransactionsRef = collection(db, `users/${user.uid}/recurringTransactions`);
-
-    const qMaterials = query(materialsRef, orderBy('createdAt', 'desc'));
-    const qTransactions = query(transactionsRef, orderBy('createdAt', 'desc'));
-    const qExpenses = query(expensesRef, orderBy('date', 'desc'));
-    const qClients = query(clientsRef, orderBy('createdAt', 'desc'));
-    const qClientTransactions = query(clientTransactionsRef, orderBy('createdAt', 'desc'));
-    const qRecurringTransactions = query(recurringTransactionsRef, orderBy('createdAt', 'desc'));
-
-    const fetchMaterials = async () => {
-      const cached = localStorage.getItem('materials_cache');
-      const timestamp = localStorage.getItem('materials_timestamp');
+    const isCacheValid = (timestampStr: string | null) => {
+      if (!timestampStr) return false;
+      const cachedDate = new Date(Number(timestampStr));
+      const now = new Date();
       
-      if (cached && timestamp && (Date.now() - Number(timestamp) < 24 * 60 * 60 * 1000)) {
-        setMaterials(JSON.parse(cached));
-        return;
+      const options: Intl.DateTimeFormatOptions = {
+        timeZone: 'Asia/Manila',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      };
+      
+      const formatter = new Intl.DateTimeFormat('en-PH', options);
+      return formatter.format(cachedDate) === formatter.format(now);
+    };
+
+    const fetchData = async () => {
+      setLoading(true);
+
+      const collections = [
+        { key: 'materials', ref: collection(db, `users/${user.uid}/materials`), setter: setMaterials, order: orderBy('createdAt', 'desc') },
+        { key: 'transactions', ref: collection(db, `users/${user.uid}/transactions`), setter: setTransactions, order: orderBy('createdAt', 'desc') },
+        { key: 'expenses', ref: collection(db, `users/${user.uid}/expenses`), setter: setExpenses, order: orderBy('date', 'desc') },
+        { key: 'clients', ref: collection(db, `users/${user.uid}/clients`), setter: setClients, order: orderBy('createdAt', 'desc') },
+        { key: 'clientTransactions', ref: collection(db, `users/${user.uid}/clientTransactions`), setter: setClientTransactions, order: orderBy('createdAt', 'desc') },
+        { key: 'recurringTransactions', ref: collection(db, `users/${user.uid}/recurringTransactions`), setter: setRecurringTransactions, order: orderBy('createdAt', 'desc') }
+      ];
+
+      for (const col of collections) {
+        const cached = localStorage.getItem(`${col.key}_cache`);
+        const timestamp = localStorage.getItem(`${col.key}_timestamp`);
+
+        if (cached && isCacheValid(timestamp)) {
+          col.setter(JSON.parse(cached));
+          continue;
+        }
+
+        try {
+          const q = query(col.ref, col.order);
+          const snapshot = await getDocs(q);
+          const data: any[] = [];
+          snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
+          
+          col.setter(data);
+          localStorage.setItem(`${col.key}_cache`, JSON.stringify(data));
+          localStorage.setItem(`${col.key}_timestamp`, String(Date.now()));
+        } catch (error) {
+          console.error(`Error fetching ${col.key}: `, error);
+        }
       }
 
-      try {
-        const querySnapshot = await getDocs(qMaterials);
-        const mats: Material[] = [];
-        querySnapshot.forEach(doc => mats.push({ id: doc.id, ...doc.data() } as Material));
-        setMaterials(mats);
-        localStorage.setItem('materials_cache', JSON.stringify(mats));
-        localStorage.setItem('materials_timestamp', String(Date.now()));
-      } catch (error) {
-        console.error("Error fetching materials: ", error);
-      }
-    };
-    
-    fetchMaterials();
-
-    const unsubscribeTransactions = onSnapshot(qTransactions, (snapshot) => {
-      const txs: Transaction[] = [];
-      snapshot.forEach(doc => txs.push({ id: doc.id, ...doc.data() } as Transaction));
-      setTransactions(txs);
-    }, (error) => {
-      console.error("Error fetching transactions: ", error);
-    });
-
-    const unsubscribeExpenses = onSnapshot(qExpenses, (snapshot) => {
-      const exps: Expense[] = [];
-      snapshot.forEach(doc => exps.push({ id: doc.id, ...doc.data() } as Expense));
-      setExpenses(exps);
-    }, (error) => {
-      console.error("Error fetching expenses: ", error);
-    });
-
-    const unsubscribeClients = onSnapshot(qClients, (snapshot) => {
-      const cls: Client[] = [];
-      snapshot.forEach(doc => cls.push({ id: doc.id, ...doc.data() } as Client));
-      setClients(cls);
       setLoading(false);
-    }, (error) => {
-      console.error("Error fetching clients: ", error);
-      setLoading(false);
-    });
-
-    const unsubscribeClientTransactions = onSnapshot(qClientTransactions, (snapshot) => {
-      const txs: ClientTransaction[] = [];
-      snapshot.forEach(doc => txs.push({ id: doc.id, ...doc.data() } as ClientTransaction));
-      setClientTransactions(txs);
-    }, (error) => {
-      console.error("Error fetching client transactions: ", error);
-    });
-
-    const unsubscribeRecurring = onSnapshot(qRecurringTransactions, (snapshot) => {
-      const recs: RecurringTransactionSchedule[] = [];
-      snapshot.forEach(doc => recs.push({ id: doc.id, ...doc.data() } as RecurringTransactionSchedule));
-      setRecurringTransactions(recs);
-    }, (error) => {
-      console.error("Error fetching recurring transactions: ", error);
-    });
-
-    return () => {
-      unsubscribeTransactions();
-      unsubscribeExpenses();
-      unsubscribeClients();
-      unsubscribeClientTransactions();
-      unsubscribeRecurring();
     };
+
+    fetchData();
   }, [user]);
 
   const addTransaction = async (tObj: Omit<Transaction, 'id' | 'date' | 'totalAmount' | 'createdAt' | 'userId'>) => {
@@ -148,6 +117,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const txRef = doc(db, `users/${user.uid}/transactions`, newTxId);
 
     const totalAmount = (tObj.quantity * tObj.pricePerUnit) - (tObj.discount || 0);
+    const date = new Date().toISOString();
+    const createdAt = Date.now();
 
     try {
       await runTransaction(db, async (transaction) => {
@@ -158,17 +129,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const stockChange = tObj.type === 'buy' ? tObj.quantity : -tObj.quantity;
         const newStock = Math.max(0, currentStock + stockChange);
 
-        transaction.update(materialRef, { currentStock: newStock, updatedAt: Date.now() });
+        transaction.update(materialRef, { currentStock: newStock, updatedAt: createdAt });
 
         const txData = {
           ...tObj,
+          id: newTxId,
           userId: user.uid,
           totalAmount,
-          date: new Date().toISOString(),
-          createdAt: Date.now()
+          date,
+          createdAt
         };
 
         transaction.set(txRef, txData);
+        
+        // Update local state for real-time feel
+        setTransactions(prev => {
+          const newList = [txData as Transaction, ...prev];
+          localStorage.setItem('transactions_cache', JSON.stringify(newList));
+          localStorage.setItem('transactions_timestamp', String(Date.now()));
+          return newList;
+        });
+        
+        setMaterials(prev => {
+          const newList = prev.map(m => m.id === tObj.materialId ? { ...m, currentStock: newStock, updatedAt: createdAt } : m);
+          localStorage.setItem('materials_cache', JSON.stringify(newList));
+          localStorage.setItem('materials_timestamp', String(Date.now()));
+          return newList;
+        });
       });
     } catch (error) {
       console.error("Transaction failed: ", error);
@@ -245,10 +232,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     try {
       const newExpRef = doc(collection(db, `users/${user.uid}/expenses`));
-      await setDoc(newExpRef, {
+      const expData = {
         ...eObj,
+        id: newExpRef.id,
         userId: user.uid,
         createdAt: Date.now()
+      };
+      await setDoc(newExpRef, expData);
+      setExpenses(prev => {
+        const newList = [expData as Expense, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        localStorage.setItem('expenses_cache', JSON.stringify(newList));
+        localStorage.setItem('expenses_timestamp', String(Date.now()));
+        return newList;
       });
     } catch (error) {
       console.error("Failed to add expense: ", error);
@@ -260,6 +255,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const expRef = doc(db, `users/${user.uid}/expenses`, id);
       await deleteDoc(expRef);
+      setExpenses(prev => {
+        const newList = prev.filter(e => e.id !== id);
+        localStorage.setItem('expenses_cache', JSON.stringify(newList));
+        localStorage.setItem('expenses_timestamp', String(Date.now()));
+        return newList;
+      });
     } catch (error) {
       console.error("Failed to delete expense: ", error);
     }
@@ -270,6 +271,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const expRef = doc(db, `users/${user.uid}/expenses`, id);
       await updateDoc(expRef, updates);
+      setExpenses(prev => {
+        const newList = prev.map(e => e.id === id ? { ...e, ...updates } : e);
+        localStorage.setItem('expenses_cache', JSON.stringify(newList));
+        localStorage.setItem('expenses_timestamp', String(Date.now()));
+        return newList;
+      });
     } catch (error) {
       console.error("Failed to update expense: ", error);
       throw error;
@@ -280,10 +287,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     try {
       const newClientRef = doc(collection(db, `users/${user.uid}/clients`));
-      await setDoc(newClientRef, {
+      const clientData = {
         ...cObj,
+        id: newClientRef.id,
         userId: user.uid,
         createdAt: Date.now()
+      };
+      await setDoc(newClientRef, clientData);
+      setClients(prev => {
+        const newList = [clientData as Client, ...prev];
+        localStorage.setItem('clients_cache', JSON.stringify(newList));
+        localStorage.setItem('clients_timestamp', String(Date.now()));
+        return newList;
       });
     } catch (error) {
       console.error("Failed to add client: ", error);
@@ -296,6 +311,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const clientRef = doc(db, `users/${user.uid}/clients`, id);
       await updateDoc(clientRef, updates);
+      setClients(prev => {
+        const newList = prev.map(c => c.id === id ? { ...c, ...updates } : c);
+        localStorage.setItem('clients_cache', JSON.stringify(newList));
+        localStorage.setItem('clients_timestamp', String(Date.now()));
+        return newList;
+      });
     } catch (error) {
       console.error("Failed to update client: ", error);
       throw error;
@@ -307,6 +328,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const clientRef = doc(db, `users/${user.uid}/clients`, id);
       await deleteDoc(clientRef);
+      setClients(prev => {
+        const newList = prev.filter(c => c.id !== id);
+        localStorage.setItem('clients_cache', JSON.stringify(newList));
+        localStorage.setItem('clients_timestamp', String(Date.now()));
+        return newList;
+      });
     } catch (error) {
       console.error("Failed to delete client: ", error);
       throw error;
@@ -317,10 +344,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     try {
       const newTxRef = doc(collection(db, `users/${user.uid}/clientTransactions`));
-      await setDoc(newTxRef, {
+      const txData = {
         ...tObj,
+        id: newTxRef.id,
         userId: user.uid,
         createdAt: Date.now()
+      };
+      await setDoc(newTxRef, txData);
+      setClientTransactions(prev => {
+        const newList = [txData as ClientTransaction, ...prev];
+        localStorage.setItem('clientTransactions_cache', JSON.stringify(newList));
+        localStorage.setItem('clientTransactions_timestamp', String(Date.now()));
+        return newList;
       });
       
       if (tObj.type === 'Payment' || tObj.type === 'Advance') {
@@ -343,10 +378,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     try {
       const newRecRef = doc(collection(db, `users/${user.uid}/recurringTransactions`));
-      await setDoc(newRecRef, {
+      const recData = {
         ...rObj,
+        id: newRecRef.id,
         userId: user.uid,
         createdAt: Date.now()
+      };
+      await setDoc(newRecRef, recData);
+      setRecurringTransactions(prev => {
+        const newList = [recData as RecurringTransactionSchedule, ...prev];
+        localStorage.setItem('recurringTransactions_cache', JSON.stringify(newList));
+        localStorage.setItem('recurringTransactions_timestamp', String(Date.now()));
+        return newList;
       });
     } catch (error) {
       console.error("Failed to add recurring transaction: ", error);
