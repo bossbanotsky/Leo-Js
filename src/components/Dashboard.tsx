@@ -27,7 +27,11 @@ export default function Dashboard() {
   const totalSold = todaysTransactions.filter(t => t.type === 'sell').reduce((sum, t) => sum + t.totalAmount, 0);
   const totalOpEx = todaysExpenses.reduce((sum, e) => sum + e.amount, 0);
   // CRM flows: Payments (pos) increase cash, Advances (neg) decrease cash
-  const crmNetFlow = todaysCrm.reduce((sum, t) => sum + t.amount, 0);
+  const crmNetFlow = todaysCrm.reduce((sum, t) => {
+    if (t.type === 'Payment') return sum + t.amount;
+    if (t.type === 'Advance') return sum - t.amount;
+    return sum;
+  }, 0);
   
   // Real Gross Profit = Revenue - (Weighted Average Cost of Sold Items)
   const realGrossProfit = todaysTransactions
@@ -73,7 +77,11 @@ export default function Dashboard() {
     const bought = dayTrans.filter(t => t.type === 'buy').reduce((sum, t) => sum + t.totalAmount, 0);
     const sold = dayTrans.filter(t => t.type === 'sell').reduce((sum, t) => sum + t.totalAmount, 0);
     const operations = dayExps.reduce((sum, e) => sum + e.amount, 0);
-    const crm = dayCrm.reduce((sum, t) => sum + t.amount, 0);
+    const crm = dayCrm.reduce((sum, t) => {
+      if (t.type === 'Payment') return sum + t.amount;
+      if (t.type === 'Advance') return sum - t.amount;
+      return sum;
+    }, 0);
     
     return {
       name: dateStr.split(' ')[0], // gets Mon, Tue, etc
@@ -81,7 +89,7 @@ export default function Dashboard() {
       purchases: bought,
       expenses: operations,
       crm: crm,
-      profit: sold - bought - operations - crm
+      profit: sold - bought - operations + crm
     };
   });
 

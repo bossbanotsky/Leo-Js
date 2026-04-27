@@ -173,7 +173,7 @@ export default function CRM() {
     const mTxs = transactions.filter(t => t.clientId === clientId);
     
     const clientBalance = cTxs.reduce((sum, t) => sum + (t.type === 'Payment' ? t.amount : -t.amount), 0);
-    const materialBalance = mTxs.reduce((sum, t) => sum + (t.type === 'buy' ? t.totalAmount : -t.totalAmount), 0);
+    const materialBalance = mTxs.reduce((sum, t) => sum + (t.type === 'sell' ? t.totalAmount : -t.totalAmount), 0);
     
     return clientBalance + materialBalance;
   };
@@ -621,101 +621,123 @@ export default function CRM() {
                         POST ENTRY
                       </button>
                     </div>
-                  </div>
+                                  <div className="space-y-4">
+                      <div className="flex items-center justify-between px-2">
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Transaction Timeline</h4>
+                        <div className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Sorted by date</div>
+                      </div>
+                      
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm border-separate border-spacing-0">
+                          <thead className="bg-slate-50 text-[10px] uppercase font-black text-slate-400 tracking-wider">
+                            <tr>
+                              <th className="px-4 py-3 border-b border-slate-100 rounded-tl-xl">Date & Flow</th>
+                              <th className="px-4 py-3 border-b border-slate-100">Particulars</th>
+                              <th className="px-4 py-3 border-b border-slate-100 text-right">Debit / In</th>
+                              <th className="px-4 py-3 border-b border-slate-100 text-right">Credit / Out</th>
+                              <th className="px-4 py-3 border-b border-slate-100 text-right font-mono">Balance</th>
+                              <th className="px-4 py-3 border-b border-slate-100 rounded-tr-xl"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {
+                              (() => {
+                                let runningBalance = 0;
+                                const cTxs = clientTransactions.filter(t => t.clientId === ledgerClient.id).map(t => ({
+                                  id: t.id,
+                                  date: t.date,
+                                  type: t.type,
+                                  notes: t.notes,
+                                  amount: (t.type === 'Payment' ? t.amount : -t.amount),
+                                  label: t.type,
+                                  details: t.notes || '-',
+                                  isManual: true
+                                }));
+                                
+                                const mTxs = transactions.filter(t => t.clientId === ledgerClient.id).map(t => {
+                                  const material = materials.find(m => m.id === t.materialId);
+                                  const matName = material?.name || 'Material';
+                                  const unit = material?.unit || 'kg';
+                                  return {
+                                    id: t.id,
+                                    date: t.date,
+                                    type: t.type,
+                                    notes: t.notes,
+                                    amount: (t.type === 'sell' ? t.totalAmount : -t.totalAmount),
+                                    label: t.type === 'buy' ? 'Inventory Purchase' : 'Inventory Sale',
+                                    details: `${matName} (${t.quantity} ${unit} @ ₱${t.pricePerUnit}/${unit})`,
+                                    isManual: false
+                                  };
+                                });
 
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between px-2 mb-2">
-                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Transaction Timeline</h4>
-                      <div className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Sorted by date</div>
-                    </div>
-                    
-                    <div className="space-y-1">
-                      {
-                        (() => {
-                          let runningBalance = 0;
-                          const cTxs = clientTransactions.filter(t => t.clientId === ledgerClient.id).map(t => ({
-                            id: t.id,
-                            date: t.date,
-                            type: t.type,
-                            notes: t.notes,
-                            amount: (t.type === 'Payment' ? t.amount : -t.amount),
-                            label: t.type,
-                            isManual: true
-                          }));
-                          
-                          const mTxs = transactions.filter(t => t.clientId === ledgerClient.id).map(t => {
-                            const matName = materials.find(m => m.id === t.materialId)?.name || 'Material';
-                            return {
-                              id: t.id,
-                              date: t.date,
-                              type: t.type,
-                              notes: t.notes,
-                              amount: (t.type === 'buy' ? t.totalAmount : -t.totalAmount),
-                              label: `${t.type === 'buy' ? 'Purchased' : 'Sold'}: ${matName}`,
-                              isManual: false
-                            };
-                          });
+                                const allSorted = [...cTxs, ...mTxs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-                          const allSorted = [...cTxs, ...mTxs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                                if (allSorted.length === 0) {
+                                  return (
+                                    <tr>
+                                      <td colSpan={6} className="py-12 text-center text-slate-400 italic">No transaction history detected</td>
+                                    </tr>
+                                  );
+                                }
 
-                          if (allSorted.length === 0) {
-                            return (
-                              <div className="py-12 text-center border-2 border-dashed border-slate-100 rounded-2xl">
-                                <p className="text-sm text-slate-400 italic">No transaction history detected</p>
-                              </div>
-                            );
-                          }
-
-                          return allSorted.map(t => {
-                            runningBalance += t.amount;
-                            return (
-                              <div key={t.id} className="group flex justify-between items-center p-3 rounded-xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100">
-                                <div className="flex items-center gap-4">
-                                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${t.amount >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                    {t.amount >= 0 ? <Plus size={14} /> : <Minus size={14} className="rotate-45" />}
-                                  </div>
-                                  <div>
-                                    <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                      {t.label} 
-                                      {t.isManual && (
-                                        <button 
-                                          onClick={async () => {
-                                            if (confirm('Delete this ledger entry?')) {
-                                              try {
-                                                await deleteClientTransaction(t.id);
-                                              } catch (err: any) {
-                                                setAlertModal({title: "Error", message: err.message});
+                                return allSorted.map(t => {
+                                  runningBalance += t.amount;
+                                  return (
+                                    <tr key={t.id} className="group hover:bg-slate-50/50 transition-all">
+                                      <td className="px-4 py-4 whitespace-nowrap">
+                                        <div className="flex items-center gap-3">
+                                          <div className={`h-2 w-2 rounded-full ${t.amount >= 0 ? 'bg-emerald-500' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]'}`} />
+                                          <div>
+                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{new Date(t.date).toLocaleDateString()}</div>
+                                            <div className={`text-xs font-bold ${t.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{t.label}</div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-4">
+                                        <div className="text-sm font-medium text-slate-600 line-clamp-1">{t.details}</div>
+                                        {t.notes && t.isManual && <div className="text-[10px] text-slate-400 italic">Ref: {t.notes}</div>}
+                                      </td>
+                                      <td className="px-4 py-4 text-right">
+                                        {t.amount >= 0 ? (
+                                          <span className="text-sm font-bold text-emerald-600">₱{t.amount.toLocaleString()}</span>
+                                        ) : '-'}
+                                      </td>
+                                      <td className="px-4 py-4 text-right">
+                                        {t.amount < 0 ? (
+                                          <span className="text-sm font-bold text-rose-600">(₱{Math.abs(t.amount).toLocaleString()})</span>
+                                        ) : '-'}
+                                      </td>
+                                      <td className="px-4 py-4 text-right">
+                                        <div className={`font-mono text-sm font-black ${runningBalance >= 0 ? 'text-blue-600' : 'text-amber-600'}`}>
+                                          ₱{runningBalance.toLocaleString()}
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-4 text-right">
+                                        {t.isManual && (
+                                          <button 
+                                            onClick={async () => {
+                                              if (confirm('Delete this ledger entry?')) {
+                                                try {
+                                                  await deleteClientTransaction(t.id);
+                                                } catch (err: any) {
+                                                  setAlertModal({title: "Error", message: err.message});
+                                                }
                                               }
-                                            }
-                                          }}
-                                          className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all ml-1"
-                                        >
-                                          <Trash2 size={12} />
-                                        </button>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-[10px] font-bold text-slate-400 uppercase">{new Date(t.date).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})}</span>
-                                      {t.notes && (
-                                        <>
-                                          <span className="h-0.5 w-0.5 rounded-full bg-slate-300"></span>
-                                          <span className="text-[10px] font-medium text-slate-400 italic">"{t.notes}"</span>
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className={`font-mono text-sm font-black ${t.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                    {t.amount >= 0 ? '+' : ''}{t.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}
-                                  </div>
-                                  <div className="text-[10px] font-bold text-slate-400">Bal: ₱{runningBalance.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                                </div>
-                              </div>
-                            );
-                          });
-                        })()
-                      }
+                                            }}
+                                            className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 hover:bg-rose-50 rounded-lg transition-all"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                });
+                              })()
+                            }
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
                 </div>
