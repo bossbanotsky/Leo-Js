@@ -27,6 +27,7 @@ interface AppState {
   addClient: (client: Omit<Client, 'id' | 'createdAt' | 'userId'>) => Promise<void>;
   updateClient: (id: string, updates: Partial<Omit<Client, 'id' | 'createdAt' | 'userId'>>) => Promise<void>;
   deleteClient: (id: string) => Promise<void>;
+  deleteClientTransaction: (id: string) => Promise<void>;
   loading: boolean;
 }
 
@@ -398,15 +399,83 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     try {
       const clientRef = doc(db, `users/${user.uid}/clients`, id);
+      
+      // Perform batch cleanup where possible or just sequential for simplicity
+      const cTxIds = clientTransactions.filter(t => t.clientId === id).map(t => t.id);
+      const recIds = recurringTransactions.filter(r => r.clientId === id).map(r => r.id);
+      const expIds = expenses.filter(e => e.clientId === id).map(e => e.id);
+
       await deleteDoc(clientRef);
+      
+      for (const tid of cTxIds) {
+        await deleteDoc(doc(db, `users/${user.uid}/clientTransactions`, tid));
+      }
+      for (const rid of recIds) {
+        await deleteDoc(doc(db, `users/${user.uid}/recurringTransactions`, rid));
+      }
+      for (const eid of expIds) {
+        await deleteDoc(doc(db, `users/${user.uid}/expenses`, eid));
+      }
+
       setClients(prev => {
         const newList = prev.filter(c => c.id !== id);
         localStorage.setItem('clients_cache', JSON.stringify(newList));
-        localStorage.setItem('clients_timestamp', String(Date.now()));
+        return newList;
+      });
+
+      setClientTransactions(prev => {
+        const newList = prev.filter(t => t.clientId !== id);
+        localStorage.setItem('clientTransactions_cache', JSON.stringify(newList));
+        return newList;
+      });
+
+      setRecurringTransactions(prev => {
+        const newList = prev.filter(r => r.clientId !== id);
+        localStorage.setItem('recurringTransactions_cache', JSON.stringify(newList));
+        return newList;
+      });
+
+      setExpenses(prev => {
+        const newList = prev.filter(e => e.clientId !== id);
+        localStorage.setItem('expenses_cache', JSON.stringify(newList));
         return newList;
       });
     } catch (error) {
       console.error("Failed to delete client: ", error);
+      throw error;
+    }
+  };
+
+  const deleteClientTransaction = async (id: string) => {
+    if (!user) return;
+    try {
+      const tx = clientTransactions.find(t => t.id === id);
+      if (!tx) return;
+
+      const txRef = doc(db, `users/${user.uid}/clientTransactions`, id);
+      await deleteDoc(txRef);
+
+      // Also find and delete the linked expense if it was created from CRM
+      const linkedExpense = expenses.find(e => e.clientId === tx.clientId && e.amount === tx.amount && e.date === tx.date && e.type === 'CRM');
+      if (linkedExpense) {
+        await deleteDoc(doc(db, `users/${user.uid}/expenses`, linkedExpense.id));
+      }
+
+      setClientTransactions(prev => {
+        const newList = prev.filter(t => t.id !== id);
+        localStorage.setItem('clientTransactions_cache', JSON.stringify(newList));
+        return newList;
+      });
+
+      if (linkedExpense) {
+        setExpenses(prev => {
+          const newList = prev.filter(e => e.id !== linkedExpense.id);
+          localStorage.setItem('expenses_cache', JSON.stringify(newList));
+          return newList;
+        });
+      }
+    } catch (error) {
+      console.error("Failed to delete client transaction: ", error);
       throw error;
     }
   };
@@ -503,7 +572,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ materials, materialsWithStats, transactions, expenses, clients, clientTransactions, recurringTransactions, addTransaction, deleteTransaction, addClientTransaction, addRecurringTransaction, syncCrmTransactionsToExpenses, updateMaterialPrice, addMaterial, updateMaterial, deleteMaterial, addExpense, updateExpense, deleteExpense, addClient, updateClient, deleteClient, loading }}>
+    <AppContext.Provider value={{ materials, materialsWithStats, transactions, expenses, clients, clientTransactions, recurringTransactions, addTransaction, deleteTransaction, addClientTransaction, addRecurringTransaction, syncCrmTransactionsToExpenses, updateMaterialPrice, addMaterial, updateMaterial, deleteMaterial, addExpense, updateExpense, deleteExpense, addClient, updateClient, deleteClient, deleteClientTransaction, loading }}>
         {children}
     </AppContext.Provider>
   );

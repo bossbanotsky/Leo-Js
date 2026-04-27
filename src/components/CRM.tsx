@@ -5,7 +5,7 @@ import { Client } from '../types';
 import ConfirmModal from './ConfirmModal';
 
 export default function CRM() {
-  const { clients, addClient, updateClient, deleteClient, clientTransactions, addClientTransaction, recurringTransactions, addRecurringTransaction, transactions, materials } = useAppStore();
+  const { clients, addClient, updateClient, deleteClient, clientTransactions, addClientTransaction, deleteClientTransaction, recurringTransactions, addRecurringTransaction, transactions, materials } = useAppStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -554,10 +554,28 @@ export default function CRM() {
                         .map(t => {
                           balance += t.amount;
                           return (
-                            <div key={t.id} className="flex justify-between items-center py-2 border-b border-gray-50">
-                              <div>
-                                <div className="text-sm font-semibold">{t.label} {t.notes && <span className="text-xs font-normal text-gray-400">({t.notes})</span>}</div>
-                                <div className="text-xs text-gray-500">{new Date(t.date).toLocaleDateString()}</div>
+                            <div key={t.id} className="group flex justify-between items-center py-2 border-b border-gray-50">
+                              <div className="flex items-center gap-3">
+                                {t.type && (
+                                  <button 
+                                    onClick={async () => {
+                                      if (confirm('Delete this ledger entry?')) {
+                                        try {
+                                          await deleteClientTransaction(t.id);
+                                        } catch (err: any) {
+                                          setAlertModal({title: "Error", message: err.message});
+                                        }
+                                      }
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                )}
+                                <div>
+                                  <div className="text-sm font-semibold">{t.label} {t.notes && <span className="text-xs font-normal text-gray-400">({t.notes})</span>}</div>
+                                  <div className="text-xs text-gray-500">{new Date(t.date).toLocaleDateString()}</div>
+                                </div>
                               </div>
                               <div className="text-right">
                                 <div className={`font-mono text-sm font-bold ${t.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>

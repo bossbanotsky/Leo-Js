@@ -106,6 +106,12 @@ export default function Expenses() {
 
   const filteredExpenses = useMemo(() => {
     const filtered = expenses.filter(exp => {
+      // Filter out CRM expenses where the client no longer exists
+      if (exp.type === 'CRM' && exp.clientId) {
+        const clientExists = clients.some(c => c.id === exp.clientId);
+        if (!clientExists) return false;
+      }
+
       const matchesSearch = exp.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             exp.category.toLowerCase().includes(searchTerm.toLowerCase());
       

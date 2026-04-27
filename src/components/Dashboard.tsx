@@ -5,13 +5,19 @@ import { ArrowDownLeft, ArrowUpRight, Banknote, ReceiptText, Box, Info } from 'l
 import { useAuth } from '../lib/AuthContext';
 
 export default function Dashboard() {
-  const { transactions, materials, materialsWithStats, expenses, clientTransactions } = useAppStore();
+  const { transactions, materials, materialsWithStats, expenses, clientTransactions, clients } = useAppStore();
   const { user } = useAuth();
 
   const today = new Date().toDateString();
   const todaysTransactions = transactions.filter(t => new Date(t.date).toDateString() === today);
-  const todaysCrm = clientTransactions.filter(t => new Date(t.date).toDateString() === today);
-  const todaysExpenses = expenses.filter(e => new Date(e.date).toDateString() === today && e.type !== 'CRM');
+  const todaysCrm = clientTransactions.filter(t => 
+    new Date(t.date).toDateString() === today && 
+    clients.some(c => c.id === t.clientId)
+  );
+  const todaysExpenses = expenses.filter(e => 
+    new Date(e.date).toDateString() === today && 
+    e.type !== 'CRM'
+  );
   
   const totalBought = todaysTransactions.filter(t => t.type === 'buy').reduce((sum, t) => sum + t.totalAmount, 0);
   const totalSold = todaysTransactions.filter(t => t.type === 'sell').reduce((sum, t) => sum + t.totalAmount, 0);
@@ -52,7 +58,10 @@ export default function Dashboard() {
   const chartData = last7Days.map(dateStr => {
     const dayTrans = transactions.filter(t => new Date(t.date).toDateString() === dateStr);
     const dayExps = expenses.filter(e => new Date(e.date).toDateString() === dateStr && e.type !== 'CRM');
-    const dayCrm = clientTransactions.filter(t => new Date(t.date).toDateString() === dateStr);
+    const dayCrm = clientTransactions.filter(t => 
+      new Date(t.date).toDateString() === dateStr &&
+      clients.some(c => c.id === t.clientId)
+    );
     
     const bought = dayTrans.filter(t => t.type === 'buy').reduce((sum, t) => sum + t.totalAmount, 0);
     const sold = dayTrans.filter(t => t.type === 'sell').reduce((sum, t) => sum + t.totalAmount, 0);
