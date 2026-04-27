@@ -1,5 +1,5 @@
-import React from 'react';
-import { LayoutDashboard, ArrowRightLeft, Boxes, Banknote, Receipt, Users, Leaf, LogOut } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { LayoutDashboard, ArrowRightLeft, Boxes, Banknote, Receipt, Users, Leaf, LogOut, Download } from 'lucide-react';
 import { ViewState } from '../types';
 import { useAuth } from '../lib/AuthContext';
 
@@ -10,6 +10,33 @@ interface SidebarProps {
 
 export function Sidebar({ currentView, onChangeView }: SidebarProps) {
   const { logout } = useAuth();
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsInstallable(false);
+    }
+    setDeferredPrompt(null);
+  };
+
   const navItems: { id: ViewState; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'transactions', label: 'Transactions', icon: <ArrowRightLeft size={20} /> },
@@ -42,6 +69,16 @@ export function Sidebar({ currentView, onChangeView }: SidebarProps) {
             {item.label}
           </button>
         ))}
+
+        {isInstallable && (
+          <button
+            onClick={handleInstallClick}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 mt-4 animate-bounce"
+          >
+            <Download size={20} />
+            Install Desktop App
+          </button>
+        )}
       </nav>
 
       <div className="p-4 border-t border-gray-200 flex flex-col gap-2">
