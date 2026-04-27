@@ -28,6 +28,7 @@ interface AppState {
   updateClient: (id: string, updates: Partial<Omit<Client, 'id' | 'createdAt' | 'userId'>>) => Promise<void>;
   deleteClient: (id: string) => Promise<void>;
   deleteClientTransaction: (id: string) => Promise<void>;
+  deleteRecurringTransaction: (id: string) => Promise<void>;
   loading: boolean;
 }
 
@@ -404,6 +405,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const cTxIds = clientTransactions.filter(t => t.clientId === id).map(t => t.id);
       const recIds = recurringTransactions.filter(r => r.clientId === id).map(r => r.id);
       const expIds = expenses.filter(e => e.clientId === id).map(e => e.id);
+      const mainTxIds = transactions.filter(t => t.clientId === id).map(t => t.id);
 
       await deleteDoc(clientRef);
       
@@ -415,6 +417,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       for (const eid of expIds) {
         await deleteDoc(doc(db, `users/${user.uid}/expenses`, eid));
+      }
+      for (const mid of mainTxIds) {
+        await deleteDoc(doc(db, `users/${user.uid}/transactions`, mid));
       }
 
       setClients(prev => {
@@ -438,6 +443,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setExpenses(prev => {
         const newList = prev.filter(e => e.clientId !== id);
         localStorage.setItem('expenses_cache', JSON.stringify(newList));
+        return newList;
+      });
+
+      setTransactions(prev => {
+        const newList = prev.filter(t => t.clientId !== id);
+        localStorage.setItem('transactions_cache', JSON.stringify(newList));
         return newList;
       });
     } catch (error) {
@@ -537,6 +548,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const deleteRecurringTransaction = async (id: string) => {
+    if (!user) return;
+    try {
+      const recRef = doc(db, `users/${user.uid}/recurringTransactions`, id);
+      await deleteDoc(recRef);
+      setRecurringTransactions(prev => {
+        const newList = prev.filter(r => r.id !== id);
+        localStorage.setItem('recurringTransactions_cache', JSON.stringify(newList));
+        localStorage.setItem('recurringTransactions_timestamp', String(Date.now()));
+        return newList;
+      });
+    } catch (error) {
+      console.error("Failed to delete recurring transaction: ", error);
+      throw error;
+    }
+  };
+
   const syncCrmTransactionsToExpenses = async () => {
     if (!user) return;
     try {
@@ -572,7 +600,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ materials, materialsWithStats, transactions, expenses, clients, clientTransactions, recurringTransactions, addTransaction, deleteTransaction, addClientTransaction, addRecurringTransaction, syncCrmTransactionsToExpenses, updateMaterialPrice, addMaterial, updateMaterial, deleteMaterial, addExpense, updateExpense, deleteExpense, addClient, updateClient, deleteClient, deleteClientTransaction, loading }}>
+    <AppContext.Provider value={{ materials, materialsWithStats, transactions, expenses, clients, clientTransactions, recurringTransactions, addTransaction, deleteTransaction, addClientTransaction, addRecurringTransaction, deleteRecurringTransaction, syncCrmTransactionsToExpenses, updateMaterialPrice, addMaterial, updateMaterial, deleteMaterial, addExpense, updateExpense, deleteExpense, addClient, updateClient, deleteClient, deleteClientTransaction, loading }}>
         {children}
     </AppContext.Provider>
   );

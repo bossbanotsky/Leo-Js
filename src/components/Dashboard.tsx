@@ -14,15 +14,20 @@ export default function Dashboard() {
     new Date(t.date).toDateString() === today && 
     clients.some(c => c.id === t.clientId)
   );
-  const todaysExpenses = expenses.filter(e => 
-    new Date(e.date).toDateString() === today && 
-    e.type !== 'CRM'
-  );
+  const todaysExpenses = expenses.filter(e => {
+    const isToday = new Date(e.date).toDateString() === today;
+    if (!isToday) return false;
+    if (e.type === 'CRM') {
+      return clients.some(c => c.id === e.clientId);
+    }
+    return true;
+  });
   
   const totalBought = todaysTransactions.filter(t => t.type === 'buy').reduce((sum, t) => sum + t.totalAmount, 0);
   const totalSold = todaysTransactions.filter(t => t.type === 'sell').reduce((sum, t) => sum + t.totalAmount, 0);
   const totalOpEx = todaysExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalCrm = todaysCrm.reduce((sum, t) => sum + t.amount, 0);
+  // CRM flows: Payments (pos) increase cash, Advances (neg) decrease cash
+  const crmNetFlow = todaysCrm.reduce((sum, t) => sum + t.amount, 0);
   
   // Real Gross Profit = Revenue - (Weighted Average Cost of Sold Items)
   const realGrossProfit = todaysTransactions
@@ -33,7 +38,9 @@ export default function Dashboard() {
       return sum + (t.totalAmount - cogs);
     }, 0);
 
-  const netCashflow = totalSold - totalBought - totalOpEx - totalCrm;
+  // Net Cashflow = Money In (Sales + CRM Payments) - Money Out (Purchases + Expenses + CRM Advances)
+  // Since Advances are saved as negative in CRM, adding crmNetFlow handles both.
+  const netCashflow = totalSold - totalBought - totalOpEx + crmNetFlow;
 
   // Inventory Value Analysis
   const inventoryMarketValue = materials.reduce((sum, m) => sum + (m.currentStock * m.sellPrice), 0);
@@ -151,8 +158,10 @@ export default function Dashboard() {
                   <span className="font-mono font-bold">₱{totalSold.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-300">Expenses & CRM Payments</span>
-                  <span className="font-mono font-bold text-rose-400">-₱{(totalOpEx + totalCrm).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                  <span className="text-slate-300">Expenses & CRM Flows</span>
+                  <span className="font-mono font-bold text-rose-400">
+                    { (totalOpEx - crmNetFlow) >= 0 ? '-' : '+' }₱{Math.abs(totalOpEx - crmNetFlow).toLocaleString(undefined, {minimumFractionDigits: 2})}
+                  </span>
                 </div>
                 <div className="pt-2 border-t border-slate-700/50 flex justify-between items-center">
                   <span className="text-blue-400 font-bold text-xs uppercase">Net Cash Performance</span>

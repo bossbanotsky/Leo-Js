@@ -84,7 +84,10 @@ export interface RecurringTransactionSchedule {
   clientId: string;
   type: 'Payment' | 'Advance';
   amount: number;
-  frequency: 'Weekly' | 'Monthly';
+  frequency: 'Weekly' | 'Monthly' | 'Custom';
+  interval?: number; // every X weeks/months
+  targetDay?: number; // Day of week (0-6) or month (1-31)
   nextDueDate: string; // ISO string
+  notes?: string;
   createdAt: number;
 }
