@@ -60,10 +60,10 @@ export default function Expenses() {
           category,
           description,
           type: expenseType,
-          quantity: Number(quantity) || undefined,
-          unitPrice: Number(unitPrice) || undefined,
-          clientId: clientId || undefined,
-          dueDate: dueDate || undefined,
+          ...(quantity ? { quantity: Number(quantity) } : {}),
+          ...(unitPrice ? { unitPrice: Number(unitPrice) } : {}),
+          ...(clientId ? { clientId } : {}),
+          ...(dueDate ? { dueDate } : {}),
         });
       } else {
         await addExpense({
@@ -71,11 +71,11 @@ export default function Expenses() {
           category,
           description,
           type: expenseType,
-          quantity: Number(quantity) || undefined,
-          unitPrice: Number(unitPrice) || undefined,
+          ...(quantity ? { quantity: Number(quantity) } : {}),
+          ...(unitPrice ? { unitPrice: Number(unitPrice) } : {}),
           date: new Date().toISOString(),
-          clientId: clientId || undefined,
-          dueDate: dueDate || undefined,
+          ...(clientId ? { clientId } : {}),
+          ...(dueDate ? { dueDate } : {}),
         });
       }
 

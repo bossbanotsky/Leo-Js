@@ -61,7 +61,7 @@ export default function Transactions() {
       discount: Number(discount) || 0,
       paymentMethod,
       clientName: clientName || 'Walk-in',
-      clientId: clientId || undefined,
+      ...(clientId ? { clientId } : {}),
       ...(notes.trim() ? { notes: notes.trim() } : {})
     };
 
@@ -281,19 +281,28 @@ export default function Transactions() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {t.type === 'buy' 
-                      ? <div className="p-1.5 rounded bg-green-100 text-green-700"><ArrowDownLeft size={16} /></div>
+                      ? (t.pricePerUnit === 0 
+                          ? <div className="p-1.5 rounded bg-amber-100 text-amber-700"><ArrowDownLeft size={16} /></div>
+                          : <div className="p-1.5 rounded bg-green-100 text-green-700"><ArrowDownLeft size={16} /></div>)
                       : <div className="p-1.5 rounded bg-blue-100 text-blue-700"><ArrowUpRight size={16} /></div>
                     }
                     <div>
-                      <h4 className="font-bold text-gray-900">{material?.name || 'Unknown'}</h4>
+                      <h4 className="font-bold text-gray-900 leading-tight">
+                        {material?.name || 'Unknown'}
+                        {t.type === 'buy' && t.pricePerUnit === 0 && (
+                          <span className="ml-2 px-1.5 py-0.5 bg-amber-50 text-amber-600 text-[8px] rounded border border-amber-100">KARGA</span>
+                        )}
+                      </h4>
                       <p className="text-[10px] text-gray-400 uppercase font-bold tracking-tighter">
                         {date.toLocaleDateString()} at {date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold font-mono text-blue-700">₱{t.totalAmount.toFixed(2)}</div>
-                    <div className="text-[10px] text-gray-400 uppercase font-black uppercase">TOTAL</div>
+                    <div className={`font-bold font-mono ${t.type === 'buy' && t.pricePerUnit === 0 ? 'text-amber-600' : 'text-blue-700'}`}>
+                      ₱{t.totalAmount.toFixed(2)}
+                    </div>
+                    <div className="text-[10px] text-gray-400 uppercase font-black">TOTAL</div>
                   </div>
                 </div>
                 
@@ -393,7 +402,18 @@ export default function Transactions() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Price / Unit</label>
+                  <div className="flex justify-between items-center mb-1.5 ml-1">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest">Price / Unit</label>
+                    {type === 'buy' && (
+                      <button 
+                        type="button"
+                        onClick={() => setPricePerUnit(0)}
+                        className="text-[10px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-tighter"
+                      >
+                        Set to 0 (Karga)
+                      </button>
+                    )}
+                  </div>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₱</span>
                     <input 
