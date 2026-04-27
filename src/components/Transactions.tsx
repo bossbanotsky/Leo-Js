@@ -120,13 +120,18 @@ export default function Transactions() {
       .reduce((sum, t) => sum + t.totalAmount, 0);
   }, [filteredTransactions]);
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this transaction? This will also revert the inventory stock change.')) {
-      try {
-        await deleteTransaction(id);
-      } catch (error) {
-        alert('Failed to delete transaction.');
-      }
+    setIsDeleting(true);
+    try {
+      await deleteTransaction(id);
+      setConfirmDeleteId(null);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -266,13 +271,31 @@ export default function Transactions() {
                       >
                         <FileText size={18} />
                       </button>
-                      <button 
-                        onClick={() => handleDelete(t.id)}
-                        className="text-gray-400 hover:text-red-600 transition-colors"
-                        title="Delete Transaction"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      {confirmDeleteId === t.id ? (
+                        <div className="inline-flex items-center gap-2 bg-red-50 p-1 rounded-lg border border-red-100">
+                          <button 
+                            disabled={isDeleting}
+                            onClick={() => handleDelete(t.id)}
+                            className="text-[10px] font-black text-red-600 hover:bg-red-600 hover:text-white px-2 py-1 rounded transition-all uppercase"
+                          >
+                            {isDeleting ? '...' : 'Confirm'}
+                          </button>
+                          <button 
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="text-[10px] font-bold text-gray-400 p-1 hover:text-gray-600"
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => setConfirmDeleteId(t.id)}
+                          className="text-gray-400 hover:text-red-600 transition-colors"
+                          title="Delete Transaction"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -338,13 +361,32 @@ export default function Transactions() {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-4 items-center">
-                  <button 
-                    onClick={() => handleDelete(t.id)}
-                    className="flex items-center gap-2 text-xs font-bold text-red-600 hover:text-red-800 transition-colors py-1 cursor-pointer"
-                  >
-                    <Trash2 size={14} /> Delete
-                  </button>
+                <div className="flex justify-end gap-6 items-center">
+                  {confirmDeleteId === t.id ? (
+                    <div className="flex items-center gap-3 bg-red-50 px-3 py-1.5 rounded-full border border-red-100 animate-pulse">
+                      <span className="text-[10px] font-black text-red-600 uppercase">Sure?</span>
+                      <button 
+                        disabled={isDeleting}
+                        onClick={() => handleDelete(t.id)}
+                        className="text-[10px] font-black bg-red-600 text-white px-3 py-1 rounded-full uppercase"
+                      >
+                        {isDeleting ? 'Deleting...' : 'Yes, Delete'}
+                      </button>
+                      <button 
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="text-gray-400"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => setConfirmDeleteId(t.id)}
+                      className="flex items-center gap-2 text-xs font-bold text-red-600 hover:text-red-800 transition-colors py-1 cursor-pointer"
+                    >
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  )}
                   <button 
                     onClick={() => setReceiptTx(t)}
                     className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors py-1 cursor-pointer"

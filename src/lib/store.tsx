@@ -139,17 +139,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const createdAt = Date.now();
 
     try {
+      let finalNewStock = 0;
+      let txData: any = null;
+
       await runTransaction(db, async (transaction) => {
         const matDoc = await transaction.get(materialRef);
         if (!matDoc.exists()) throw new Error("Material does not exist!");
 
         const currentStock = matDoc.data().currentStock || 0;
         const stockChange = tObj.type === 'buy' ? tObj.quantity : -tObj.quantity;
-        const newStock = Math.max(0, currentStock + stockChange);
+        finalNewStock = Math.max(0, currentStock + stockChange);
 
-        transaction.update(materialRef, { currentStock: newStock, updatedAt: createdAt });
+        transaction.update(materialRef, { currentStock: finalNewStock, updatedAt: createdAt });
 
-        const txData = {
+        txData = {
           ...tObj,
           id: newTxId,
           userId: user.uid,
@@ -159,21 +162,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
 
         transaction.set(txRef, txData);
-        
-        // Update local state for real-time feel
-        setTransactions(prev => {
-          const newList = [txData as Transaction, ...prev];
-          localStorage.setItem('transactions_cache', JSON.stringify(newList));
-          localStorage.setItem('transactions_timestamp', String(Date.now()));
-          return newList;
-        });
-        
-        setMaterials(prev => {
-          const newList = prev.map(m => m.id === tObj.materialId ? { ...m, currentStock: newStock, updatedAt: createdAt } : m);
-          localStorage.setItem('materials_cache', JSON.stringify(newList));
-          localStorage.setItem('materials_timestamp', String(Date.now()));
-          return newList;
-        });
+      });
+
+      // Update local state AFTER successful transaction
+      setTransactions(prev => {
+        const newList = [txData as Transaction, ...prev];
+        localStorage.setItem('transactions_cache', JSON.stringify(newList));
+        localStorage.setItem('transactions_timestamp', String(Date.now()));
+        return newList;
+      });
+      
+      setMaterials(prev => {
+        const newList = prev.map(m => m.id === tObj.materialId ? { ...m, currentStock: finalNewStock, updatedAt: createdAt } : m);
+        localStorage.setItem('materials_cache', JSON.stringify(newList));
+        localStorage.setItem('materials_timestamp', String(Date.now()));
+        return newList;
       });
     } catch (error) {
       console.error("Transaction failed: ", error);
@@ -191,37 +194,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const now = Date.now();
 
     try {
+      let finalNewStock = 0;
+      let hasMat = false;
+
       await runTransaction(db, async (transaction) => {
         const matDoc = await transaction.get(materialRef);
         
-        let newStock = 0;
         if (matDoc.exists()) {
+          hasMat = true;
           const currentStock = matDoc.data().currentStock || 0;
-          // Reverse the stock change: if we bought, we subtract; if we sold, we add
           const stockChange = txToDelete.type === 'buy' ? -txToDelete.quantity : txToDelete.quantity;
-          newStock = Math.max(0, currentStock + stockChange);
-          transaction.update(materialRef, { currentStock: newStock, updatedAt: now });
+          finalNewStock = Math.max(0, currentStock + stockChange);
+          transaction.update(materialRef, { currentStock: finalNewStock, updatedAt: now });
         }
 
         transaction.delete(txRef);
-        
-        // Update local state
-        setTransactions(prev => {
-          const newList = prev.filter(t => t.id !== id);
-          localStorage.setItem('transactions_cache', JSON.stringify(newList));
-          localStorage.setItem('transactions_timestamp', String(Date.now()));
+      });
+
+      // Update local state AFTER successful transaction
+      setTransactions(prev => {
+        const newList = prev.filter(t => t.id !== id);
+        localStorage.setItem('transactions_cache', JSON.stringify(newList));
+        localStorage.setItem('transactions_timestamp', String(Date.now()));
+        return newList;
+      });
+      
+      if (hasMat) {
+        setMaterials(prev => {
+          const newList = prev.map(m => m.id === txToDelete.materialId ? { ...m, currentStock: finalNewStock, updatedAt: now } : m);
+          localStorage.setItem('materials_cache', JSON.stringify(newList));
+          localStorage.setItem('materials_timestamp', String(Date.now()));
           return newList;
         });
-        
-        if (matDoc.exists()) {
-          setMaterials(prev => {
-            const newList = prev.map(m => m.id === txToDelete.materialId ? { ...m, currentStock: newStock, updatedAt: now } : m);
-            localStorage.setItem('materials_cache', JSON.stringify(newList));
-            localStorage.setItem('materials_timestamp', String(Date.now()));
-            return newList;
-          });
-        }
-      });
+      }
     } catch (error) {
       console.error("Failed to delete transaction: ", error);
       throw error;

@@ -184,7 +184,10 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Cashflow (Last 7 Days)</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center justify-between">
+            <span>Cashflow (Last 7 Days)</span>
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full uppercase tracking-tighter">Real-time Performance</span>
+          </h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
@@ -212,28 +215,55 @@ export default function Dashboard() {
                 <Tooltip 
                   cursor={{stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4'}}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+                  formatter={(value) => [`₱${Number(value).toFixed(2)}`]}
                 />
-                <Area type="monotone" dataKey="sales" name="Sales (₱)" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorSold)" />
-                <Area type="monotone" dataKey="purchases" name="Purchases (₱)" stroke="#f43f5e" strokeWidth={2} fillOpacity={1} fill="url(#colorBought)" />
-                <Area type="monotone" dataKey="expenses" name="Op Expenses (₱)" stroke="#f97316" strokeWidth={2} fillOpacity={1} fill="url(#colorExpense)" />
-                <Area type="monotone" dataKey="crm" name="CRM (₱)" stroke="#a855f7" strokeWidth={2} fillOpacity={1} fill="url(#colorCrm)" />
+                <Area type="monotone" dataKey="sales" name="Sales (Revenue)" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorSold)" />
+                <Area type="monotone" dataKey="purchases" name="Purchases (Cost)" stroke="#f43f5e" strokeWidth={2} fillOpacity={1} fill="url(#colorBought)" />
+                <Area type="monotone" dataKey="expenses" name="Op Expenses" stroke="#f97316" strokeWidth={2} fillOpacity={1} fill="url(#colorExpense)" />
+                <Area type="monotone" dataKey="crm" name="CRM/Advance" stroke="#a855f7" strokeWidth={2} fillOpacity={1} fill="url(#colorCrm)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Top Inventory by Volume</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={getTopMaterials()} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fill: '#475569', fontSize: 13}} width={120} />
-                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                <Bar dataKey="stock" name="Stock (kg)" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
-              </BarChart>
-            </ResponsiveContainer>
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Profit Margin Breakdown</h3>
+          <div className="space-y-4">
+            {materialsWithStats.filter(m => m.currentStock > 0 || transactions.some(t => t.materialId === m.id)).slice(0, 6).map(m => {
+              const sellPrice = m.sellPrice;
+              const avgCost = m.weightedAverageCost;
+              const marginAmt = sellPrice - avgCost;
+              const marginPct = sellPrice > 0 ? (marginAmt / sellPrice) * 100 : 0;
+              
+              return (
+                <div key={m.id} className="space-y-2">
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <p className="text-sm font-bold text-gray-800 line-clamp-1">{m.name}</p>
+                      <p className="text-[10px] text-gray-400">Avg Cost: ₱{avgCost.toFixed(2)} | Sell: ₱{sellPrice.toFixed(2)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-xs font-black ${marginPct > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {marginPct.toFixed(1)}%
+                      </p>
+                    </div>
+                  </div>
+                  <div className="h-1.5 w-full bg-gray-50 rounded-full overflow-hidden flex">
+                    <div 
+                      className="h-full bg-gray-200" 
+                      style={{ width: `${Math.max(0, (avgCost / (sellPrice || 1)) * 100)}%` }} 
+                    />
+                    <div 
+                      className={`h-full transition-all duration-1000 ${marginPct > 40 ? 'bg-emerald-500' : marginPct > 20 ? 'bg-blue-500' : 'bg-amber-500'}`} 
+                      style={{ width: `${Math.max(0, marginPct)}%` }} 
+                    />
+                  </div>
+                </div>
+              );
+            })}
+            {materials.length === 0 && (
+              <p className="text-center text-sm text-gray-400 py-10">No materials tracked yet.</p>
+            )}
           </div>
         </div>
       </div>
