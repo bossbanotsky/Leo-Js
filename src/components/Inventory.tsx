@@ -6,7 +6,7 @@ import { defaultMaterials } from '../lib/defaultMaterials';
 import ConfirmModal from './ConfirmModal';
 
 export default function Inventory() {
-  const { materials, addMaterial, updateMaterial, deleteMaterial, transactions } = useAppStore();
+  const { materials, materialsWithStats, addMaterial, updateMaterial, deleteMaterial, transactions } = useAppStore();
   const [filterType, setFilterType] = useState<MaterialType | 'All'>('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -48,7 +48,7 @@ export default function Inventory() {
     setIsModalOpen(true);
   };
 
-  const filteredMaterials = materials.filter(m => {
+  const filteredMaterials = (materialsWithStats || []).filter(m => {
     const matchType = filterType === 'All' || m.type === filterType;
     const matchSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase());
     return matchType && matchSearch;
@@ -248,17 +248,18 @@ export default function Inventory() {
                       {m.type}
                     </span>
                   </div>
-                  <div className="text-right text-xs text-gray-400 space-y-1 font-mono">
-                    <div>Buy: <span className="font-semibold text-gray-700">₱{m.buyPrice.toFixed(2)}</span></div>
-                    <div>Sell: <span className="font-semibold text-blue-700">₱{m.sellPrice.toFixed(2)}</span></div>
-                    <div className="flex gap-2 justify-end mt-2 pt-2 border-t border-gray-100">
-                      <div className="flex-1 text-left">
-                        {m.sellPrice > 0 && (
-                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${((m.sellPrice - m.buyPrice) / m.sellPrice) > 0.3 ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400'}`}>
-                            {Math.round(((m.sellPrice - m.buyPrice) / m.sellPrice) * 100)}% MARGIN
-                          </span>
-                        )}
-                      </div>
+                    <div className="text-right text-[10px] text-gray-400 space-y-1 font-mono">
+                      <div>Market Buy: <span className="font-semibold text-gray-700">₱{m.buyPrice.toFixed(2)}</span></div>
+                      <div>Avg. Cost: <span className="font-bold text-amber-600">₱{m.weightedAverageCost.toFixed(2)}</span></div>
+                      <div>Sell: <span className="font-bold text-blue-700">₱{m.sellPrice.toFixed(2)}</span></div>
+                      <div className="flex gap-2 justify-end mt-2 pt-2 border-t border-gray-100">
+                        <div className="flex-1 text-left">
+                          {m.sellPrice > 0 && (
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${((m.sellPrice - m.weightedAverageCost) / m.sellPrice) > 0.3 ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400'}`}>
+                              {Math.round(((m.sellPrice - m.weightedAverageCost) / m.sellPrice) * 100)}% MARGIN
+                            </span>
+                          )}
+                        </div>
                       <button onClick={() => setSelectedMaterial(m)} className="text-slate-300 hover:text-purple-500" title="View transactions"><FileText size={14}/></button>
                       <button onClick={() => openModal(m)} className="text-slate-300 hover:text-blue-500" title="Edit material"><Edit size={14}/></button>
                       {m.conversionRate && (

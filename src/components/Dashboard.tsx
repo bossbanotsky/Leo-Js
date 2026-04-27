@@ -1,10 +1,12 @@
 import React from 'react';
 import { useAppStore } from '../lib/store';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { ArrowDownLeft, ArrowUpRight, Banknote, ReceiptText } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Banknote, ReceiptText, Box, Info } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
 
 export default function Dashboard() {
-  const { transactions, materials, expenses, clientTransactions } = useAppStore();
+  const { transactions, materials, materialsWithStats, expenses, clientTransactions } = useAppStore();
+  const { user } = useAuth();
 
   const today = new Date().toDateString();
   const todaysTransactions = transactions.filter(t => new Date(t.date).toDateString() === today);
@@ -16,26 +18,28 @@ export default function Dashboard() {
   const totalOpEx = todaysExpenses.reduce((sum, e) => sum + e.amount, 0);
   const totalCrm = todaysCrm.reduce((sum, t) => sum + t.amount, 0);
   
-  // Gross Profit = Revenue from sales - estimated cost of goods sold
-  // Since we don't have historical price tracking for exact batches, 
-  // we'll estimate using current buy prices or transaction costs
-  const grossProfit = todaysTransactions
+  // Real Gross Profit = Revenue - (Weighted Average Cost of Sold Items)
+  const realGrossProfit = todaysTransactions
     .filter(t => t.type === 'sell')
     .reduce((sum, t) => {
-      const material = materials.find(m => m.id === t.materialId);
-      const estCost = (material?.buyPrice || 0) * t.quantity;
-      return sum + (t.totalAmount - estCost);
+      const material = materialsWithStats.find(m => m.id === t.materialId);
+      const cogs = (material?.weightedAverageCost || 0) * t.quantity;
+      return sum + (t.totalAmount - cogs);
     }, 0);
 
-  const netProfit = totalSold - totalBought - totalOpEx - totalCrm;
+  const netCashflow = totalSold - totalBought - totalOpEx - totalCrm;
+
+  // Inventory Value Analysis
+  const inventoryMarketValue = materials.reduce((sum, m) => sum + (m.currentStock * m.sellPrice), 0);
+  const inventoryCostBasis = materialsWithStats.reduce((sum, m) => sum + (m.currentStock * (m.weightedAverageCost || 0)), 0);
+  const potentialInventoryProfit = inventoryMarketValue - inventoryCostBasis;
 
   // Quick stats summary
   const stats = [
-    { label: "Today's Gross Sales", value: `₱${totalSold.toFixed(2)}`, icon: <ArrowUpRight size={24} className="text-emerald-500" /> },
-    { label: "Today's Mat. Purchases", value: `₱${totalBought.toFixed(2)}`, icon: <ArrowDownLeft size={24} className="text-rose-500" /> },
-    { label: "Est. Margin on Sales", value: `₱${grossProfit.toFixed(2)}`, icon: <Banknote size={24} className="text-amber-500" /> },
-    { label: "Today's Op Expenses", value: `₱${totalOpEx.toFixed(2)}`, icon: <ReceiptText size={24} className="text-orange-500" /> },
-    { label: "Today's Net Cashflow", value: `₱${netProfit.toFixed(2)}`, icon: <Banknote size={24} className="text-blue-500" /> },
+    { label: "Today's Gross Sales", value: `₱${totalSold.toLocaleString(undefined, {minimumFractionDigits: 2})}`, icon: <ArrowUpRight size={24} className="text-emerald-500" /> },
+    { label: "Real Profit on Sales", value: `₱${realGrossProfit.toLocaleString(undefined, {minimumFractionDigits: 2})}`, icon: <Banknote size={24} className="text-amber-500" />, sub: "Accounting for free material costs" },
+    { label: "Today's Net Cashflow", value: `₱${netCashflow.toLocaleString(undefined, {minimumFractionDigits: 2})}`, icon: <Banknote size={24} className="text-blue-500" /> },
+    { label: "Inv. Market Value", value: `₱${inventoryMarketValue.toLocaleString(undefined, {minimumFractionDigits: 2})}`, icon: <Box size={24} className="text-purple-500" /> },
   ];
 
   // Process data for charts
@@ -81,16 +85,101 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, idx) => (
-          <div key={idx} className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">{stat.label}</p>
-              <h3 className="text-2xl font-bold font-mono text-gray-900 mt-1">{stat.value}</h3>
+          <div key={idx} className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between w-full">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{stat.label}</p>
+              <div className="h-10 w-10 rounded-xl bg-gray-50 flex items-center justify-center">
+                {stat.icon}
+              </div>
             </div>
-            <div className="h-12 w-12 rounded-full bg-gray-50 flex items-center justify-center">
-              {stat.icon}
+            <div className="mt-4">
+              <h3 className="text-2xl font-bold font-mono text-gray-900 tracking-tight">{stat.value}</h3>
+              {stat.sub && (
+                <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+                  <Info size={10} /> {stat.sub}
+                </p>
+              )}
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Profit Breakdown Analysis */}
+      <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-2xl shadow-xl text-white overflow-hidden relative">
+        <div className="absolute top-0 right-0 p-8 opacity-10">
+          <Banknote size={120} />
+        </div>
+        <div className="relative z-10">
+          <h3 className="text-lg font-bold flex items-center gap-2 mb-6">
+            <Banknote className="text-amber-400" /> 
+            Profitability & Inventory Analysis
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="space-y-4">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Inventory Value</p>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-300">Book Value (At Cost)</span>
+                  <span className="font-mono font-bold">₱{inventoryCostBasis.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-300">Potential Market Value</span>
+                  <span className="font-mono font-bold">₱{inventoryMarketValue.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                </div>
+                <div className="pt-2 border-t border-slate-700/50 flex justify-between items-center">
+                  <span className="text-amber-400 font-bold text-xs uppercase">Unrealized Profit</span>
+                  <span className="font-mono font-bold text-lg text-amber-400">₱{potentialInventoryProfit.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Today's Performance</p>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-300">Gross Sales Volume</span>
+                  <span className="font-mono font-bold">₱{totalSold.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-300">Expenses & CRM Payments</span>
+                  <span className="font-mono font-bold text-rose-400">-₱{(totalOpEx + totalCrm).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                </div>
+                <div className="pt-2 border-t border-slate-700/50 flex justify-between items-center">
+                  <span className="text-blue-400 font-bold text-xs uppercase">Net Cash Performance</span>
+                  <span className="font-mono font-bold text-lg text-blue-400">₱{netCashflow.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Efficiency Stats</p>
+              <div className="bg-white/5 rounded-xl p-4 border border-white/10 space-y-4">
+                <div>
+                  <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1">
+                    <span>Target Margin</span>
+                    <span>30%</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-amber-400 rounded-full transition-all duration-1000" 
+                      style={{ width: `${Math.min(100, (realGrossProfit / (totalSold || 1)) * 100)}%` }} 
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">Real profit margin on sales: {((realGrossProfit / (totalSold || 1)) * 100).toFixed(1)}%</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-400/20 text-amber-400 rounded-lg">
+                    <Info size={16} />
+                  </div>
+                  <p className="text-[9px] text-slate-300 leading-tight italic">
+                    "Karga" items have ₱0 cost basis. Weighted average cost automatically updates when you buy paid materials.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">

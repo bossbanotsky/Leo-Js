@@ -6,6 +6,7 @@ import { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, runTransacti
 
 interface AppState {
   materials: Material[];
+  materialsWithStats: (Material & { weightedAverageCost: number })[];
   transactions: Transaction[];
   expenses: Expense[];
   clients: Client[];
@@ -40,6 +41,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [clientTransactions, setClientTransactions] = useState<ClientTransaction[]>([]);
   const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransactionSchedule[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const materialsWithStats = React.useMemo(() => {
+    return materials.map(m => {
+      // Find all buy transactions for this material
+      const buys = transactions.filter(t => t.materialId === m.id && t.type === 'buy');
+      const totalQuantityBought = buys.reduce((sum, t) => sum + t.quantity, 0);
+      const totalCost = buys.reduce((sum, t) => sum + t.totalAmount, 0);
+      
+      const weightedAverageCost = totalQuantityBought > 0 ? totalCost / totalQuantityBought : m.buyPrice;
+      
+      return {
+        ...m,
+        weightedAverageCost
+      };
+    });
+  }, [materials, transactions]);
 
   useEffect(() => {
     if (!user) {
@@ -481,7 +498,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ materials, transactions, expenses, clients, clientTransactions, recurringTransactions, addTransaction, deleteTransaction, addClientTransaction, addRecurringTransaction, syncCrmTransactionsToExpenses, updateMaterialPrice, addMaterial, updateMaterial, deleteMaterial, addExpense, updateExpense, deleteExpense, addClient, updateClient, deleteClient, loading }}>
+    <AppContext.Provider value={{ materials, materialsWithStats, transactions, expenses, clients, clientTransactions, recurringTransactions, addTransaction, deleteTransaction, addClientTransaction, addRecurringTransaction, syncCrmTransactionsToExpenses, updateMaterialPrice, addMaterial, updateMaterial, deleteMaterial, addExpense, updateExpense, deleteExpense, addClient, updateClient, deleteClient, loading }}>
         {children}
     </AppContext.Provider>
   );
